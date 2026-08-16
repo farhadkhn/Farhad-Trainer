@@ -3,223 +3,60 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b1220">
+  <meta name="theme-color" content="#0a1020">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Farhad Trainer">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <meta name="description" content="Farhad Trainer — personal 12-week home-gym recomposition coach.">
+  <link rel="manifest" href="manifest.webmanifest?v=2.0.0">
+  <link rel="apple-touch-icon" href="icon-192.png?v=2.0.0">
+  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <title>Farhad Trainer V2</title>
 </head>
 <body>
-<header class="topbar">
-  <div>
-    <div class="brand">Farhad Trainer</div>
-    <div class="sub">V2 · personal recomp coach</div>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand-wrap"><div class="brand-mark">FT</div><div><div class="brand">Farhad Trainer</div><div class="version">V2.0.0 · Rebuilt</div></div></div>
+      <button id="installBtn" class="icon-btn hidden">Install</button>
+    </header>
+    <main class="content">
+      <section id="home" class="page active">
+        <div class="hero-panel"><div><div class="eyebrow light">12-WEEK BODY RECOMP</div><h1>Your next training block</h1><p>Tuesday · Thursday · Saturday · 45 minutes · home gym + dumbbells</p></div><div class="hero-controls"><label>Program week</label><select id="weekSelect"></select></div></div>
+        <div class="metric-grid"><article class="metric-card"><span>Latest weight</span><strong id="homeWeight">—</strong><small>kg</small></article><article class="metric-card"><span>This week</span><strong id="homeSessions">0/3</strong><small>sessions</small></article><article class="metric-card"><span>Exercise PRs</span><strong id="homePRs">0</strong><small>tracked</small></article><article class="metric-card"><span>Adherence</span><strong id="homeAdherence">0%</strong><small>program</small></article></div>
+        <article class="panel primary-action-panel"><div class="panel-heading"><div><div class="eyebrow">NEXT SESSION</div><h2 id="nextWorkoutTitle">Day 1 — Push + Core</h2><p id="nextWorkoutMeta" class="muted"></p></div><span id="phaseChip" class="chip accent"></span></div><div id="nextWorkoutMuscles" class="muscle-summary"></div><div class="button-row"><button id="startNextWorkout" class="btn primary">Start workout</button><button id="openLastWorkout" class="btn secondary">View last workout</button></div></article>
+        <article class="panel"><div class="panel-heading"><div><div class="eyebrow">WEEK VIEW</div><h2>Tuesday · Thursday · Saturday</h2></div><button id="calendarFromHome" class="btn tertiary">Add to calendar</button></div><div id="weekStrip" class="week-strip"></div></article>
+        <article class="panel"><div class="panel-heading"><div><div class="eyebrow">MUSCLE COVERAGE</div><h2>Trained this week</h2></div></div><div id="weeklyMuscleMap"></div><p class="tiny muted">Training illustration only — not a diagnostic or anatomical assessment.</p></article>
+        <article class="panel"><div class="eyebrow">COACHING</div><h2 id="phaseTitle">Adaptation phase</h2><p id="phaseCopy" class="muted"></p><div class="focus-row"><span>Upper chest</span><span>Lats</span><span>Side delts</span><span>Rear delts</span><span>Core</span></div></article>
+      </section>
+
+      <section id="plan" class="page">
+        <article class="panel"><div class="panel-heading"><div><div class="eyebrow">PROGRAM</div><h2>Weekly plan</h2></div><button id="calendarFromPlan" class="btn tertiary">Add 12 weeks</button></div><div class="schedule-editor"><div><label>Day 1</label><select id="schedDay1"></select><input id="schedTime1" type="time"></div><div><label>Day 2</label><select id="schedDay2"></select><input id="schedTime2" type="time"></div><div><label>Day 3</label><select id="schedDay3"></select><input id="schedTime3" type="time"></div></div><button id="saveSchedule" class="btn primary">Save schedule</button></article><div id="planCards"></div>
+      </section>
+
+      <section id="workout" class="page">
+        <article class="panel"><div class="segmented"><button class="segment active" data-workout-tab="session">Current session</button><button class="segment" data-workout-tab="history">Workout history</button></div></article>
+        <div id="workoutSessionView"><article class="panel"><div class="workout-header-grid"><div><div class="eyebrow">WORKOUT</div><h2 id="workoutTitle"></h2><p id="workoutFocus" class="muted"></p></div><div class="session-controls"><label>Choose workout</label><select id="workoutSelect"><option value="1">Day 1 — Push + Core</option><option value="2">Day 2 — Pull + Core</option><option value="3">Day 3 — Legs + Shoulders</option></select><label>Date</label><input id="workoutDate" type="date"></div></div><div class="notice">Warm-up: band pull-aparts 2×15 · hip bridges 2×12 · dead bugs 2×10/side.</div></article><div id="exerciseCards"></div><article class="panel finish-panel"><div class="eyebrow">SESSION FINISH</div><div class="form-grid two"><div><label>Average RPE</label><input id="sessionRPE" type="number" min="1" max="10" step=".5"></div><div><label>Session score /10</label><input id="sessionScore" type="number" min="1" max="10"></div></div><label>Notes</label><textarea id="sessionNotes" placeholder="What felt good? What should change next time?"></textarea><div class="button-row"><button id="saveDraftBtn" class="btn secondary">Save draft</button><button id="finishWorkoutBtn" class="btn success">Finish workout</button></div></article></div>
+        <div id="workoutHistoryView" class="hidden"><article class="panel"><div class="panel-heading"><div><div class="eyebrow">HISTORY</div><h2>Completed workouts</h2></div></div><div id="workoutHistoryList"></div></article></div>
+      </section>
+
+      <section id="learn" class="page"><article class="panel"><div class="eyebrow">LEARN</div><h2>Exercise library</h2><input id="exerciseSearch" placeholder="Search exercises, e.g. row or squat"><div class="tiny muted library-note">Each exercise includes muscles worked, form cues, common mistakes, and a YouTube demo search.</div></article><div id="exerciseLibrary"></div></section>
+
+      <section id="progress" class="page">
+        <article class="panel"><div class="eyebrow">BODY PROGRESS</div><h2>Measurements & photos</h2><div class="form-grid five"><div><label>Weight (kg)</label><input id="metricWeight" type="number" step=".1"></div><div><label>Waist (cm)</label><input id="metricWaist" type="number" step=".1"></div><div><label>Chest (cm)</label><input id="metricChest" type="number" step=".1"></div><div><label>Arm (cm)</label><input id="metricArm" type="number" step=".1"></div><div><label>Thigh (cm)</label><input id="metricThigh" type="number" step=".1"></div></div><label>Progress note</label><textarea id="metricNote" placeholder="Energy, clothes fit, visual changes, etc."></textarea><div class="photo-grid"><label class="photo-picker">Front photo<input id="photoFront" type="file" accept="image/*"></label><label class="photo-picker">Side photo<input id="photoSide" type="file" accept="image/*"></label><label class="photo-picker">Back photo<input id="photoBack" type="file" accept="image/*"></label></div><button id="saveProgressBtn" class="btn primary">Save progress check</button></article>
+        <div class="chart-grid"><article class="panel"><div class="eyebrow">TREND</div><h2>Body weight</h2><canvas id="weightChart" width="900" height="260"></canvas></article><article class="panel"><div class="eyebrow">TREND</div><h2>Training volume</h2><canvas id="volumeChart" width="900" height="260"></canvas></article></div>
+        <article class="panel"><div class="eyebrow">PROGRESS PHOTOS</div><h2>Photo timeline</h2><div id="photoTimeline" class="photo-timeline"></div></article>
+        <article class="panel"><div class="eyebrow">BODY HISTORY</div><h2>Recent entries</h2><div id="metricHistory"></div></article>
+      </section>
+
+      <section id="checkin" class="page"><article class="panel"><div class="eyebrow">WEEKLY CHECK-IN</div><h2>How did the week go?</h2><div class="form-grid three"><div><label>Weight today</label><input id="ciWeight" type="number" step=".1"></div><div><label>Sessions completed</label><input id="ciSessions" type="number" min="0" max="3"></div><div><label>Average session RPE</label><input id="ciRPE" type="number" min="1" max="10" step=".5"></div><div><label>Sleep quality 1–5</label><input id="ciSleep" type="number" min="1" max="5"></div><div><label>Energy / motivation 1–5</label><input id="ciEnergy" type="number" min="1" max="5"></div><div><label>Any pain?</label><select id="ciPain"><option>No</option><option>Yes</option></select></div></div><label>What felt good?</label><textarea id="ciGood"></textarea><label>What felt difficult or should change?</label><textarea id="ciDifficult"></textarea><label>Key lifts trend</label><select id="ciLifts"><option>Up</option><option>Same</option><option>Down</option></select><button id="saveCheckinBtn" class="btn primary">Save weekly check-in</button></article><article class="panel"><div class="eyebrow">COACH SUMMARY</div><h2>Automatic guidance</h2><div id="coachSummary" class="notice">Complete your first weekly check-in to get coaching guidance.</div></article></section>
+
+      <section id="settings" class="page"><article class="panel"><div class="eyebrow">APP</div><h2>Farhad Trainer V2.0.0</h2><div class="settings-list"><div><span>Goal</span><strong>Body recomposition</strong></div><div><span>Training</span><strong>3 days/week · 45 min</strong></div><div><span>Equipment</span><strong>Home gym + dumbbells</strong></div><div><span>Storage</span><strong>IndexedDB on this device</strong></div></div><div class="button-row"><button id="exportDataBtn" class="btn secondary">Export backup</button><button id="clearCacheBtn" class="btn secondary">Refresh app files</button><button id="resetAppBtn" class="btn danger">Reset all data</button></div></article><article class="panel"><div class="eyebrow">SAFETY</div><h2>Training guidance</h2><p class="muted">Sharp or joint pain: stop and substitute. Chest pain, dizziness, or abnormal symptoms during exercise: stop immediately and seek medical attention. This app provides general fitness guidance and is not a medical diagnosis.</p></article></section>
+    </main>
+
+    <nav class="bottom-nav"><button data-page="home" class="active"><span>⌂</span>Home</button><button data-page="plan"><span>▦</span>Plan</button><button data-page="workout"><span>●</span>Workout</button><button data-page="learn"><span>?</span>Learn</button><button data-page="progress"><span>↗</span>Progress</button><button data-page="checkin"><span>✓</span>Check-in</button><button data-page="settings"><span>⚙</span>Settings</button></nav>
   </div>
-  <button id="installBtn" class="btn secondary hidden">Install</button>
-</header>
-
-<main class="app">
-  <section id="home" class="page active">
-    <div class="hero card">
-      <div>
-        <div class="eyebrow">CURRENT PROGRAM</div>
-        <h1>3-Day Recomp Plan</h1>
-        <p>Tuesday · Thursday · Saturday · 45 minutes</p>
-      </div>
-      <div class="weekbox">
-        <label>Week</label>
-        <select id="weekSelect"></select>
-      </div>
-    </div>
-
-    <div class="kpis">
-      <div class="kpi"><span>Weight</span><strong id="kpiWeight">—</strong></div>
-      <div class="kpi"><span>This week</span><strong id="kpiSessions">0/3</strong></div>
-      <div class="kpi"><span>PRs</span><strong id="kpiPRs">0</strong></div>
-      <div class="kpi"><span>Adherence</span><strong id="kpiAdherence">0%</strong></div>
-    </div>
-
-    <div class="card">
-      <div class="section-head">
-        <div><div class="eyebrow">TODAY</div><h2 id="todayTitle">Next workout</h2></div>
-        <span id="phaseBadge" class="badge"></span>
-      </div>
-      <div id="todaySummary" class="notice"></div>
-      <div class="actions">
-        <button id="startNext" class="btn">Start workout</button>
-        <button id="addCalendarHome" class="btn secondary">Add schedule to calendar</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">THIS WEEK</div><h2>Training schedule</h2>
-      <div id="weekStrip" class="weekstrip"></div>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">COACHING FOCUS</div><h2>What we’re emphasizing</h2>
-      <div class="muscle-tags">
-        <span>Upper chest</span><span>Lats</span><span>Side delts</span><span>Rear delts</span><span>Core</span>
-      </div>
-      <p id="phaseNote" class="muted"></p>
-    </div>
-  </section>
-
-  <section id="week" class="page">
-    <div class="card">
-      <div class="section-head">
-        <div><div class="eyebrow">SCHEDULE</div><h2>Training days</h2></div>
-        <button id="addCalendarWeek" class="btn secondary">Add 12 weeks</button>
-      </div>
-      <div class="schedule-grid">
-        <div><label>Day 1</label><select id="sched1"></select><input id="time1" type="time"></div>
-        <div><label>Day 2</label><select id="sched2"></select><input id="time2" type="time"></div>
-        <div><label>Day 3</label><select id="sched3"></select><input id="time3" type="time"></div>
-      </div>
-      <button id="saveSchedule" class="btn">Save schedule</button>
-    </div>
-    <div id="weekCards"></div>
-  </section>
-
-  <section id="workout" class="page">
-    <div class="card">
-      <div class="workout-head">
-        <div>
-          <div class="eyebrow">WORKOUT</div>
-          <h2 id="workoutTitle"></h2>
-          <div id="workoutFocus" class="muted"></div>
-        </div>
-        <div class="compact-controls">
-          <label>Workout</label>
-          <select id="workoutSelect">
-            <option value="1">Day 1 — Push + Core</option>
-            <option value="2">Day 2 — Pull + Core</option>
-            <option value="3">Day 3 — Legs + Shoulders</option>
-          </select>
-          <label>Date</label>
-          <input id="workoutDate" type="date">
-        </div>
-      </div>
-      <div class="notice">Warm-up: band pull-aparts 2×15 · hip bridges 2×12 · dead bugs 2×10/side.</div>
-    </div>
-
-    <div id="exerciseList"></div>
-
-    <div class="card sticky-actions">
-      <div class="inline-grid">
-        <div><label>Average session RPE</label><input id="sessionRPE" type="number" min="1" max="10" step=".5"></div>
-        <div><label>Session score /10</label><input id="sessionScore" type="number" min="1" max="10"></div>
-      </div>
-      <label>Session notes</label>
-      <textarea id="sessionNotes" placeholder="What felt good? What should change next time?"></textarea>
-      <div class="actions">
-        <button id="saveDraft" class="btn secondary">Save draft</button>
-        <button id="finishWorkout" class="btn success">Finish workout</button>
-      </div>
-    </div>
-  </section>
-
-  <section id="learn" class="page">
-    <div class="card">
-      <div class="eyebrow">EXERCISE LIBRARY</div><h2>Learn the movements</h2>
-      <input id="learnSearch" placeholder="Search exercises">
-    </div>
-    <div id="learnList"></div>
-  </section>
-
-  <section id="progress" class="page">
-    <div class="card">
-      <div class="eyebrow">BODY PROGRESS</div><h2>Track improvements</h2>
-      <div class="progress-grid">
-        <div><label>Weight (kg)</label><input id="bodyWeight" type="number" step=".1"></div>
-        <div><label>Waist (cm)</label><input id="waist" type="number" step=".1"></div>
-        <div><label>Chest (cm)</label><input id="chest" type="number" step=".1"></div>
-        <div><label>Arm (cm)</label><input id="arm" type="number" step=".1"></div>
-        <div><label>Thigh (cm)</label><input id="thigh" type="number" step=".1"></div>
-      </div>
-      <label>Progress note</label>
-      <textarea id="progressNote" placeholder="Energy, clothes fit, visual changes, etc."></textarea>
-      <button id="saveProgress" class="btn">Save progress entry</button>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">TRENDS</div><h2>Weight</h2>
-      <canvas id="weightChart" width="1000" height="260"></canvas>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">TRENDS</div><h2>Training volume</h2>
-      <canvas id="volumeChart" width="1000" height="260"></canvas>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">WORKOUT HISTORY</div><h2>Saved workouts</h2>
-      <div id="workoutHistory"></div>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">BODY HISTORY</div><h2>Recent entries</h2>
-      <div id="progressHistory"></div>
-    </div>
-  </section>
-
-  <section id="checkin" class="page">
-    <div class="card">
-      <div class="eyebrow">WEEKLY CHECK-IN</div><h2>How did the week go?</h2>
-      <div class="check-grid">
-        <div><label>Weight today</label><input id="ciWeight" type="number" step=".1"></div>
-        <div><label>Sessions completed</label><input id="ciSessions" type="number" min="0" max="3"></div>
-        <div><label>Average session RPE</label><input id="ciRPE" type="number" min="1" max="10" step=".5"></div>
-        <div><label>Sleep quality 1–5</label><input id="ciSleep" type="number" min="1" max="5"></div>
-        <div><label>Energy / motivation 1–5</label><input id="ciEnergy" type="number" min="1" max="5"></div>
-        <div><label>Any pain?</label><select id="ciPain"><option>No</option><option>Yes</option></select></div>
-      </div>
-      <label>What felt good?</label><textarea id="ciGood"></textarea>
-      <label>What felt difficult or should change?</label><textarea id="ciDifficult"></textarea>
-      <label>Key lifts trend</label><select id="ciLifts"><option>Up</option><option>Same</option><option>Down</option></select>
-      <button id="saveCheckin" class="btn">Save weekly check-in</button>
-    </div>
-    <div class="card">
-      <div class="eyebrow">COACH SUMMARY</div><h2>Automatic guidance</h2>
-      <div id="coachSummary" class="notice">Complete your first check-in to get a summary.</div>
-    </div>
-  </section>
-
-  <section id="settings" class="page">
-    <div class="card">
-      <div class="eyebrow">PROFILE</div><h2>Program settings</h2>
-      <div class="settings-grid">
-        <div><label>Goal</label><input value="Body recomposition" readonly></div>
-        <div><label>Program</label><input value="12 weeks" readonly></div>
-        <div><label>Session length</label><input value="45 minutes" readonly></div>
-        <div><label>Equipment</label><input value="Home gym + dumbbells" readonly></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="eyebrow">DATA</div><h2>Backup</h2>
-      <p class="muted">V2 stores data in IndexedDB, which is more reliable than the V1 local form cache.</p>
-      <div class="actions">
-        <button id="exportData" class="btn secondary">Export data</button>
-        <button id="resetAll" class="btn danger">Reset all data</button>
-      </div>
-    </div>
-  </section>
-</main>
-
-<nav class="bottom-nav">
-  <button data-page="home" class="active">Home</button>
-  <button data-page="week">Week</button>
-  <button data-page="workout">Workout</button>
-  <button data-page="learn">Learn</button>
-  <button data-page="progress">Progress</button>
-  <button data-page="checkin">Check-in</button>
-  <button data-page="settings">Settings</button>
-</nav>
-
-<div id="toast" class="toast hidden"></div>
-<script src="app.js"></script>
+  <div id="restTimer" class="rest-timer hidden"><div><small>REST</small><strong id="restTimerDisplay">01:30</strong></div><button id="pauseRestBtn">Pause</button><button id="skipRestBtn">Skip</button></div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js?v=2.0.0"></script>
 </body>
 </html>

@@ -1,22 +1,15 @@
 {
   "name": "Farhad Trainer V2",
   "short_name": "Farhad Trainer",
+  "id": "farhad-trainer-v2",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f6f8fb",
-  "theme_color": "#0b1220",
-  "description": "Personal home-gym recomp coach with workout tracking, progress, learning links, and IndexedDB persistence.",
+  "background_color": "#f3f6fb",
+  "theme_color": "#0a1020",
+  "description": "Personal 12-week home-gym and dumbbell body recomposition coach.",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    {"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
   ]
 }
