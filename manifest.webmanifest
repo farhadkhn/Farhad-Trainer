@@ -1,13 +1,13 @@
 {
-  "name": "Farhad Trainer V2.1",
+  "name": "Farhad Trainer V2.3",
   "short_name": "Farhad Trainer",
-  "id": "farhad-trainer-v21",
+  "id": "farhad-trainer-v23",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f3f6fb",
   "theme_color": "#0a1020",
-  "description": "Flexible Workout A-B-C recomp coach with strict set validation and recurring measurement comparisons.",
+  "description": "Flexible recomp coach with pounds, stable workout history, and deletable history entries.",
   "icons": [
     {
       "src": "icon-192.png",
