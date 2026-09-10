@@ -1,13 +1,14 @@
-# Farhad Trainer V2.3 — Simplified Tracking
+# Farhad Trainer V2.4
 
-Built from V2.2 with the latest requested improvements.
+Fixes:
+- Home stats are recalculated from IndexedDB on every app start, refresh, and return to Home.
+- Home shows “Loading…” while data is being read instead of flashing zeroes.
+- Uses the same IndexedDB database as V2.1–V2.3 so existing workout history remains available.
+- Progress history entries are tappable.
+- Opening a progress entry shows full measurements, notes, and saved photos.
+- Progress entries can be deleted with confirmation.
+- Workout history remains persistent and deletable.
+- Weight unit stays lb.
+- RPE input remains removed.
 
-## New in V2.3
-- Removed all **RPE input fields** from workout sets, session finish, and weekly check-in.
-- Progression is now simpler: hit the top of the rep range on all valid sets, then add 2.5–5%; if a set falls below the bottom of the range, reduce about 5%; otherwise keep the load and add reps.
-- Added **How to measure (?)** help beside Weight, Waist, Chest, Arm, and Thigh.
-- Each help popup shows a simple placement illustration plus repeatability instructions.
-- Retains pounds (lb), strict completed-set validation, flexible Workout A → B → C sequence, stable workout history, delete-history controls, body comparisons, photos, timers, exercise library, and offline PWA support.
-
-## Deploy
-Upload these 8 files over the existing repository files and commit. Then open Farhad Trainer and use **Settings → Refresh app files** once. The header should read **V2.3 · Simplified Tracking**.
+After deployment, use Settings → Refresh app files once.
