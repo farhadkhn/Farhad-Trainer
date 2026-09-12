@@ -1,14 +1,19 @@
-# Farhad Trainer V2.4
+# Farhad Trainer V2.4.1 — Loading Fix
 
-Fixes:
-- Home stats are recalculated from IndexedDB on every app start, refresh, and return to Home.
-- Home shows “Loading…” while data is being read instead of flashing zeroes.
-- Uses the same IndexedDB database as V2.1–V2.3 so existing workout history remains available.
-- Progress history entries are tappable.
-- Opening a progress entry shows full measurements, notes, and saved photos.
-- Progress entries can be deleted with confirmation.
-- Workout history remains persistent and deletable.
-- Weight unit stays lb.
-- RPE input remains removed.
+This patch fixes the V2.4 dashboard getting stuck on “Loading…”.
 
-After deployment, use Settings → Refresh app files once.
+## Root cause addressed
+Older saved workout entries can have slightly different field shapes from newer versions. V2.4 assumed every historical record used the newest schema, so one legacy record could abort the Home rendering process.
+
+## Fixes
+- Defensive migration/compatibility handling for legacy workout records
+- Dashboard reads Weight / Sessions / PRs / Adherence independently
+- A malformed old record can no longer leave every card stuck on Loading…
+- Next-workout detection understands both `workoutId` and older `workout` fields
+- Unknown legacy exercises no longer crash PR calculations
+- Progress history remains tappable and deletable
+- Workout history remains persistent and deletable
+- Fixed missing body-measurement numeric helper
+- Uses the SAME IndexedDB database as V2.1–V2.4 so existing history is preserved
+
+After uploading to GitHub Pages, open the site and refresh once. If Safari still shows V2.4, use the browser reload again or Settings → Refresh app files from the prior version before replacing it.
