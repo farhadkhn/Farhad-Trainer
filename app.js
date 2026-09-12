@@ -1,6 +1,6 @@
 
-const DB_NAME = "FarhadTrainerV21";
-const VERSION = "2.4.4";
+const DB_NAME = "FarhadTrainerV2DB";
+const VERSION = "2.4.5";
 
 const WORKOUTS = {
   1:{letter:"A",name:"Push + Core",focus:"Chest · shoulders · triceps · core",ex:[
@@ -32,12 +32,81 @@ function youtubeGuide(name){
   return `https://www.youtube.com/results?search_query=${q}`;
 }
 
+function openOtherDB(name){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(name);
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+    req.onupgradeneeded=()=>{ try{req.transaction.abort()}catch(_){} };
+  });
+}
+function readStoreFromDB(database,store){
+  return new Promise(resolve=>{
+    if(!database.objectStoreNames.contains(store)){ resolve([]); return; }
+    try{
+      const r=database.transaction(store).objectStore(store).getAll();
+      r.onsuccess=()=>resolve(r.result||[]);
+      r.onerror=()=>resolve([]);
+    }catch(_){ resolve([]); }
+  });
+}
+async function mergeOldV24Database(){
+  // V2.4.x accidentally switched to FarhadTrainerV21.
+  // Copy anything entered there back into the original V2DB used by V2.0–V2.3.
+  let old;
+  try{ old=await openOtherDB("FarhadTrainerV21"); }catch(_){ return; }
+  try{
+    const mappings=[
+      ["sessions","sessions"],
+      ["drafts","drafts"],
+      ["checkins","checkins"],
+      ["measurements","metrics"]
+    ];
+    for(const [source,target] of mappings){
+      const items=await readStoreFromDB(old,source);
+      for(const item of items){
+        if(item && item.id) await put(target,item).catch(()=>{});
+      }
+    }
+    const oldSettings=await readStoreFromDB(old,"settings");
+    // Keep current/original settings if present; only fill gaps from V2.4 settings.
+    if(oldSettings.length){
+      const cur=await get("settings","main").catch(()=>null);
+      if(!cur) await put("settings",oldSettings[0]).catch(()=>{});
+    }
+  } finally {
+    try{ old.close(); }catch(_){}
+  }
+}
+async function mergeVeryOldV2Database(){
+  // Earliest prototype used FarhadTrainerV2 with stores workouts/progress.
+  // Import only if those records have recognizable IDs.
+  let old;
+  try{ old=await openOtherDB("FarhadTrainerV2"); }catch(_){ return; }
+  try{
+    const workouts=await readStoreFromDB(old,"workouts");
+    for(const item of workouts){
+      if(!item || !item.id) continue;
+      const converted={...item};
+      if(converted.workoutId==null && converted.workout!=null) converted.workoutId=converted.workout;
+      if(!converted.completedAt) converted.completedAt=converted.savedAt||converted.createdAt||Date.now();
+      await put("sessions",converted).catch(()=>{});
+    }
+    const progress=await readStoreFromDB(old,"progress");
+    for(const item of progress){
+      if(item && item.id) await put("metrics",item).catch(()=>{});
+    }
+  } finally {
+    try{ old.close(); }catch(_){}
+  }
+}
+
 function openDB(){
   return new Promise((resolve,reject)=>{
     const req = indexedDB.open(DB_NAME,1);
     req.onupgradeneeded = ()=>{
       db = req.result;
-      ["settings","drafts","sessions","measurements","checkins"].forEach(name=>{
+      ["settings","drafts","sessions","metrics","checkins"].forEach(name=>{
         if(!db.objectStoreNames.contains(name)) db.createObjectStore(name,{keyPath:"id"});
       });
     };
@@ -128,7 +197,7 @@ async function renderHome(){
 
   try{
     const sessions=await all("sessions").catch(()=>[]);
-    const measurements=await all("measurements").catch(()=>[]);
+    const measurements=await all("metrics").catch(()=>[]);
     measurements.sort((a,b)=>safeTime(a)-safeTime(b));
 
     const now=new Date(), start=new Date(now);
@@ -325,7 +394,7 @@ async function saveMeasurement(){
     note:$("mNote")?.value||"",
     photos:{front:await fileData($("pFront")?.files?.[0]),side:await fileData($("pSide")?.files?.[0]),back:await fileData($("pBack")?.files?.[0])}
   };
-  await put("measurements",rec);
+  await put("metrics",rec);
   toast("Progress saved");
   await renderProgress();
   await renderHome();
@@ -333,19 +402,19 @@ async function saveMeasurement(){
 async function renderProgress(){
   const holder=$("measurementHistory");
   if(!holder) return;
-  const m=(await all("measurements")).sort((a,b)=>safeTime(a)-safeTime(b));
+  const m=(await all("metrics")).sort((a,b)=>safeTime(a)-safeTime(b));
   holder.innerHTML=m.length?m.slice().reverse().map(x=>`<button class="progress-entry" type="button" data-progress-id="${esc(x.id)}"><b>${esc(x.date||"Unknown date")}</b><div class="muted">${x.weight??"—"} lb · waist ${x.waist??"—"} cm · chest ${x.chest??"—"} cm · arm ${x.arm??"—"} cm · thigh ${x.thigh??"—"} cm</div></button>`).join(""):'<div class="muted">No progress entries yet.</div>';
   document.querySelectorAll("[data-progress-id]").forEach(b=>b.onclick=()=>openProgress(b.dataset.progressId));
 }
 async function openProgress(id){
-  const x=await get("measurements",id);
+  const x=await get("metrics",id);
   if(!x) return;
   const photos=Object.entries(x.photos||{}).filter(([,v])=>v);
   $("modalContent").innerHTML=`<h2>${esc(x.date||"Progress entry")}</h2><div class="history"><div>Weight: <b>${x.weight??"—"} lb</b></div><div>Waist: <b>${x.waist??"—"} cm</b></div><div>Chest: <b>${x.chest??"—"} cm</b></div><div>Arm: <b>${x.arm??"—"} cm</b></div><div>Thigh: <b>${x.thigh??"—"} cm</b></div></div>${x.note?`<div class="history">${esc(x.note)}</div>`:""}${photos.length?`<div class="modalphotos">${photos.map(([p,u])=>`<div><b>${esc(p)}</b><img src="${u}"></div>`).join("")}</div>`:""}<button id="deleteProgress" class="delete" type="button">Delete progress entry</button>`;
   $("modal")?.classList.remove("hidden");
   $("deleteProgress").onclick=async()=>{
     if(confirm("Delete this progress entry?")){
-      await remove("measurements",id);
+      await remove("metrics",id);
       closeModal();
       toast("Progress entry deleted");
       await renderProgress();
@@ -378,10 +447,10 @@ async function refreshApp(){
   setTimeout(()=>location.reload(),500);
 }
 async function exportData(){
-  const data={version:VERSION,settings,sessions:await all("sessions"),drafts:await all("drafts"),measurements:await all("measurements"),checkins:await all("checkins")};
+  const data={version:VERSION,settings,sessions:await all("sessions"),drafts:await all("drafts"),metrics:await all("metrics"),checkins:await all("checkins")};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="Farhad-Trainer-V2.4.4-Backup.json"; a.click();
+  a.href=URL.createObjectURL(blob); a.download="Farhad-Trainer-V2.4.5-Backup.json"; a.click();
 }
 
 
@@ -433,7 +502,7 @@ async function openWorkoutHistoryEntry(id){
 async function renderHistoryPageProgress(){
   const holder=$("historyPageProgressList");
   if(!holder) return;
-  const entries=(await all("measurements")).sort((a,b)=>safeTime(b)-safeTime(a));
+  const entries=(await all("metrics")).sort((a,b)=>safeTime(b)-safeTime(a));
   if(!entries.length){
     holder.innerHTML='<div class="muted">No progress entries yet.</div>';
     return;
@@ -488,6 +557,8 @@ function bind(){
 
 async function init(){
   await openDB();
+  await mergeOldV24Database();
+  await mergeVeryOldV2Database();
   settings={...settings,...(await get("settings","main")||{})};
   await put("settings",settings);
   if($("workoutDate")) $("workoutDate").value=today();
@@ -495,7 +566,7 @@ async function init(){
   await renderHome();
   await renderWorkout();
   await renderProgress();
-  if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js?v=2.4.4").catch(()=>{});
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js?v=2.4.5").catch(()=>{});
 }
 
 window.addEventListener("error",e=>console.error("Farhad Trainer error",e.error||e.message));

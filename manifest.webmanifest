@@ -1,7 +1,7 @@
 {
-  "name": "Farhad Trainer V2.4.4",
+  "name": "Farhad Trainer V2.4.5",
   "short_name": "Farhad Trainer",
-  "id": "farhad-trainer-v244",
+  "id": "farhad-trainer-v245",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -19,5 +19,5 @@
       "type": "image/png"
     }
   ],
-  "description": "Exercise guides plus dedicated workout and progress history."
+  "description": "Restores V2.0\u2013V2.3 workout and progress history while retaining V2.4 history and exercise-guide fixes."
 }
