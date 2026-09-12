@@ -1,25 +1,433 @@
-const DB='FarhadTrainerV21',VERSION='2.4.0';
-const W={1:{letter:'A',name:'Push + Core',focus:'Chest · shoulders · triceps · core',ex:[['Incline Dumbbell Press','weighted',4],['Flat Dumbbell Press','weighted',3],['Standing Dumbbell Shoulder Press','weighted',3],['Lateral Raise','weighted',3],['Overhead Triceps Extension','weighted',3],['Plank','timed',3]]},2:{letter:'B',name:'Pull + Core',focus:'Back · rear delts · biceps · core',ex:[['One-arm Dumbbell Row','weighted',4],['Dumbbell Pullover','weighted',4],['Rear Delt Fly','weighted',3],['Dumbbell Curl','weighted',3],['Hammer Curl','weighted',2],['Side Plank','timed',3]]},3:{letter:'C',name:'Legs + Shoulders',focus:'Quads · glutes · hamstrings · delts',ex:[['Goblet Squat','weighted',4],['Dumbbell Romanian Deadlift','weighted',4],['Bulgarian Split Squat','weighted',3],['Standing Calf Raise','weighted',3],['Lateral Raise','weighted',3],['Farmer Carry','timed_weighted',3]]}};
-let db,settings={id:'main',week:1,measurementInterval:14,migratedToLb:true,weightUnit:'lb'};const $=id=>document.getElementById(id),today=()=>new Date().toISOString().slice(0,10);
-function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{db=r.result;['settings','drafts','sessions','measurements','checkins'].forEach(s=>{if(!db.objectStoreNames.contains(s))db.createObjectStore(s,{keyPath:'id'})})};r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>rej(r.error)})}function put(s,o){return new Promise((res,rej)=>{let r=db.transaction(s,'readwrite').objectStore(s).put(o);r.onsuccess=()=>res(o);r.onerror=()=>rej(r.error)})}function get(s,id){return new Promise((res,rej)=>{let r=db.transaction(s).objectStore(s).get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}function all(s){return new Promise((res,rej)=>{let r=db.transaction(s).objectStore(s).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}function del(s,id){return new Promise((res,rej)=>{let r=db.transaction(s,'readwrite').objectStore(s).delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
-function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),1500)}function valid(def,s){if(!s.done)return false;if(def==='weighted')return +s.weight>0&&+s.reps>0;if(def==='timed')return +s.seconds>0;return +s.weight>0&&+s.seconds>0}
-async function init(){await openDB();settings={...settings,...(await get('settings','main')||{})};await put('settings',settings);for(let i=1;i<=12;i++)$('weekSelect').innerHTML+=`<option value='${i}'>Week ${i}</option>`;$('weekSelect').value=settings.week;$('workoutDate').value=today();bind();await renderHome();await renderWorkout();await renderProgress();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=2.4.1').catch(()=>{})}
-function bind(){document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>nav(b.dataset.page));$('weekSelect').onchange=async()=>{settings.week=+$('weekSelect').value;await put('settings',settings);await renderHome()};$('startNextBtn').onclick=async()=>{$('workoutSelect').value=await nextId();await renderWorkout();nav('workout')};$('resumeDraftBtn').onclick=resumeDraft;$('goProgressBtn').onclick=()=>nav('progress');$('workoutSelect').onchange=renderWorkout;$('workoutDate').onchange=renderWorkout;$('saveDraftBtn').onclick=saveDraft;$('finishBtn').onclick=finish;$('currentSessionTab').onclick=showSession;$('historyTab').onclick=showHistory;$('backToSessionBtn').onclick=showSession;$('saveMeasurementBtn').onclick=saveMeasurement;document.querySelectorAll('.help').forEach(b=>b.onclick=()=>help(b.dataset.help));$('closeModal').onclick=closeModal;$('modal').onclick=e=>{if(e.target===$('modal'))closeModal()};$('refreshBtn').onclick=refreshApp;$('exportBtn').onclick=exportData}
-async function nav(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$(p).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));if(p==='home')await renderHome();if(p==='workout'){await renderWorkout();showSession()}if(p==='progress')await renderProgress()}
-async function renderHome(){$('homeWeight').textContent='Loading…';$('homeSessions').textContent='Loading…';$('homePRs').textContent='Loading…';$('homeAdherence').textContent='Loading…';const [sessions,ms]=await Promise.all([all('sessions'),all('measurements')]);ms.sort((a,b)=>a.createdAt-b.createdAt);let now=new Date(),start=new Date(now);start.setDate(now.getDate()-now.getDay());start.setHours(0,0,0,0);let end=new Date(start);end.setDate(start.getDate()+7);let week=sessions.filter(x=>{let d=new Date(x.date+'T12:00:00');return d>=start&&d<end});let best={};sessions.forEach(x=>x.exercises?.forEach(e=>e.sets?.forEach(s=>{let def=W[x.workoutId]?.ex.find(z=>z[0]===e.name)?.[1];if(def&&valid(def,s))best[e.name]=1})));$('homeWeight').textContent=ms.at(-1)?.weight??'—';$('homeSessions').textContent=`${week.length}/3`;$('homePRs').textContent=Object.keys(best).length;$('homeAdherence').textContent=`${Math.min(100,Math.round(sessions.length/(Math.max(1,settings.week)*3)*100))}%`;let id=await nextId();$('nextWorkoutTitle').textContent=`Workout ${W[id].letter} — ${W[id].name}`;$('nextWorkoutMeta').textContent=W[id].focus;let last=ms.at(-1);if(!last)$('bodyCheckSummary').textContent='Add your first body measurement to create a baseline.';else{let due=new Date(last.date+'T12:00:00');due.setDate(due.getDate()+(settings.measurementInterval||14));$('bodyCheckSummary').textContent=`Next check-in: ${due.toLocaleDateString()}`}}
-async function nextId(){let s=await all('sessions');if(!s.length)return 1;s.sort((a,b)=>b.completedAt-a.completedAt);return s[0].workoutId%3+1}
-function draftId(){return`draft:${$('workoutDate').value}:${$('workoutSelect').value}`}async function renderWorkout(){let id=+$('workoutSelect').value,w=W[id],d=await get('drafts',draftId());let h='';w.ex.forEach((e,ei)=>{let sets='';for(let si=0;si<e[2];si++){let v=d?.data?.exercises?.[ei]?.sets?.[si]||{};if(e[1]==='weighted')sets+=`<div class='setrow' data-r='${ei}-${si}'><span>S${si+1}</span><input data-e='${ei}' data-s='${si}' data-f='weight' type='number' step='.5' placeholder='lb' value='${v.weight??''}'><input data-e='${ei}' data-s='${si}' data-f='reps' type='number' placeholder='reps' value='${v.reps??''}'><input class='done' data-e='${ei}' data-s='${si}' data-f='done' type='checkbox' ${v.done?'checked':''}></div>`;else if(e[1]==='timed')sets+=`<div class='setrow' data-r='${ei}-${si}'><span>S${si+1}</span><input data-e='${ei}' data-s='${si}' data-f='seconds' type='number' placeholder='sec' value='${v.seconds??''}'><input disabled value='—'><input class='done' data-e='${ei}' data-s='${si}' data-f='done' type='checkbox' ${v.done?'checked':''}></div>`;else sets+=`<div class='setrow' data-r='${ei}-${si}'><span>S${si+1}</span><input data-e='${ei}' data-s='${si}' data-f='weight' type='number' step='.5' placeholder='lb' value='${v.weight??''}'><input data-e='${ei}' data-s='${si}' data-f='seconds' type='number' placeholder='sec' value='${v.seconds??''}'><input class='done' data-e='${ei}' data-s='${si}' data-f='done' type='checkbox' ${v.done?'checked':''}></div>`}h+=`<div class='exercise'><div class='exhead' data-t='${ei}'>${e[0]} <span class='muted'>${e[2]} sets</span></div><div id='b${ei}' class='exbody ${ei===0?'':'hidden'}'><div class='setrow muted'><span>Set</span><span>${e[1]==='timed'?'Sec':'LB'}</span><span>${e[1]==='weighted'?'Reps':'Sec'}</span><span>✓</span></div>${sets}</div></div>`});$('exerciseCards').innerHTML=h;document.querySelectorAll('[data-t]').forEach(x=>x.onclick=()=>$('b'+x.dataset.t).classList.toggle('hidden'));document.querySelectorAll('#exerciseCards input[data-e]').forEach(x=>x.onchange=saveDraft);$('sessionNotes').value=d?.data?.notes??''}
-function collect(){let id=+$('workoutSelect').value,w=W[id],exercises=w.ex.map(e=>({name:e[0],sets:Array.from({length:e[2]},()=>({weight:'',reps:'',seconds:'',done:false}))}));document.querySelectorAll('#exerciseCards input[data-e]').forEach(x=>{let e=+x.dataset.e,s=+x.dataset.s,f=x.dataset.f;exercises[e].sets[s][f]=x.type==='checkbox'?x.checked:(x.value===''?'':+x.value)});return{workoutId:id,date:$('workoutDate').value,notes:$('sessionNotes').value,exercises}}async function saveDraft(){await put('drafts',{id:draftId(),updatedAt:Date.now(),data:collect()})}async function finish(){let d=collect(),w=W[d.workoutId],cnt=0;d.exercises.forEach((e,ei)=>e.sets.forEach((s,si)=>{let def=w.ex[ei][1];s.valid=valid(def,s);if(s.valid)cnt++;else if(s.done)document.querySelector(`[data-r='${ei}-${si}']`)?.classList.add('bad')}));if(!cnt){toast('No valid completed sets');return}await put('sessions',{id:`session:${Date.now()}`,completedAt:Date.now(),date:d.date,workoutId:d.workoutId,name:w.name,notes:d.notes,exercises:d.exercises});await del('drafts',draftId());toast('Workout saved');await renderWorkout();await renderHome()}
-async function resumeDraft(){let d=(await all('drafts')).sort((a,b)=>b.updatedAt-a.updatedAt)[0];if(!d){toast('No saved draft');return}$('workoutSelect').value=d.data.workoutId;$('workoutDate').value=d.data.date;await renderWorkout();nav('workout')}function showSession(){$('currentSessionTab').classList.add('active');$('historyTab').classList.remove('active');$('sessionView').classList.remove('hidden');$('historyView').classList.add('hidden')}async function showHistory(){$('historyTab').classList.add('active');$('currentSessionTab').classList.remove('active');$('sessionView').classList.add('hidden');$('historyView').classList.remove('hidden');await renderHistory()}async function renderHistory(){let s=(await all('sessions')).sort((a,b)=>b.completedAt-a.completedAt);$('historyList').innerHTML=s.length?s.map(x=>`<details class='history'><summary>${x.date} · Workout ${W[x.workoutId].letter} — ${x.name}</summary>${x.exercises.map((e,ei)=>`<div class='history'><b>${e.name}</b>${e.sets.filter(set=>valid(W[x.workoutId].ex[ei][1],set)).map((set,i)=>`<div class='muted'>Set ${i+1}: ${set.weight||'—'} lb · ${set.reps||set.seconds||'—'}</div>`).join('')}</div>`).join('')}<button class='delete' data-del='${x.id}'>Delete workout</button></details>`).join(''):'<div class="muted">No workouts yet.</div>';document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('Delete this workout?')){await del('sessions',b.dataset.del);toast('Workout deleted');await renderHistory();await renderHome()}})}
-async function fileData(f){if(!f)return null;return await new Promise((r,j)=>{let x=new FileReader();x.onload=()=>r(x.result);x.onerror=()=>j(x.error);x.readAsDataURL(f)})}async function saveMeasurement(){let rec={id:`m:${Date.now()}`,date:today(),createdAt:Date.now(),weight:num('mWeight'),waist:num('mWaist'),chest:num('mChest'),arm:num('mArm'),thigh:num('mThigh'),note:$('mNote').value,photos:{front:await fileData($('pFront').files[0]),side:await fileData($('pSide').files[0]),back:await fileData($('pBack').files[0])}};await put('measurements',rec);toast('Progress saved');await renderProgress();await renderHome()}const num=id=>$(id).value===''?null:+$(id).value;async function renderProgress(){let m=(await all('measurements')).sort((a,b)=>a.createdAt-b.createdAt);$('measurementHistory').innerHTML=m.length?m.slice().reverse().map(x=>`<div class='progress-entry' data-p='${x.id}'><b>${x.date}</b><div class='muted'>${x.weight??'—'} lb · waist ${x.waist??'—'} cm · chest ${x.chest??'—'} cm · arm ${x.arm??'—'} cm · thigh ${x.thigh??'—'} cm</div></div>`).join(''):'<div class="muted">No progress entries yet.</div>';document.querySelectorAll('[data-p]').forEach(e=>e.onclick=()=>openProgress(e.dataset.p))}
-async function openProgress(id){let x=await get('measurements',id),photos=Object.entries(x.photos||{}).filter(([k,v])=>v);$('modalContent').innerHTML=`<h2>${x.date}</h2><div class='history'><div>Weight: <b>${x.weight??'—'} lb</b></div><div>Waist: <b>${x.waist??'—'} cm</b></div><div>Chest: <b>${x.chest??'—'} cm</b></div><div>Arm: <b>${x.arm??'—'} cm</b></div><div>Thigh: <b>${x.thigh??'—'} cm</b></div></div>${x.note?`<div class='history'>${esc(x.note)}</div>`:''}${photos.length?`<div class='modalphotos'>${photos.map(([p,u])=>`<div><b>${p}</b><img src='${u}'></div>`).join('')}</div>`:''}<button id='delProgress' class='delete'>Delete progress entry</button>`;$('modal').classList.remove('hidden');$('delProgress').onclick=async()=>{if(confirm('Delete this progress entry?')){await del('measurements',id);closeModal();toast('Progress entry deleted');await renderProgress();await renderHome()}}}
-function help(t){let c={weight:['Weight','Use the same scale under similar conditions, ideally in the morning after using the bathroom and before breakfast.'],waist:['Waist','Measure horizontally at navel level, relaxed, after a normal exhale.'],chest:['Chest','Measure around the fullest part of the chest, roughly nipple level.'],arm:['Arm','Measure around the largest part of the same upper arm each time, arm relaxed.'],thigh:['Thigh','Measure around the largest part of the same upper thigh each time.']}[t];$('modalContent').innerHTML=`<h2>${c[0]}</h2><div class='history'>${c[1]}</div>`;$('modal').classList.remove('hidden')}function closeModal(){$('modal').classList.add('hidden')}async function refreshApp(){if('serviceWorker'in navigator){for(let r of await navigator.serviceWorker.getRegistrations())await r.unregister()}if('caches'in window){for(let k of await caches.keys())await caches.delete(k)}toast('App files refreshed');setTimeout(()=>location.reload(true),500)}async function exportData(){let data={version:VERSION,settings,sessions:await all('sessions'),drafts:await all('drafts'),measurements:await all('measurements')};let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='Farhad-Trainer-V2.4-Backup.json';a.click()}function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}window.addEventListener("error",e=>console.error("Farhad Trainer error:",e.error||e.message));
-window.addEventListener("unhandledrejection",e=>console.error("Farhad Trainer promise error:",e.reason));
+
+const DB_NAME = "FarhadTrainerV21";
+const VERSION = "2.4.2";
+
+const WORKOUTS = {
+  1:{letter:"A",name:"Push + Core",focus:"Chest · shoulders · triceps · core",ex:[
+    ["Incline Dumbbell Press","weighted",4],["Flat Dumbbell Press","weighted",3],
+    ["Standing Dumbbell Shoulder Press","weighted",3],["Lateral Raise","weighted",3],
+    ["Overhead Triceps Extension","weighted",3],["Plank","timed",3]
+  ]},
+  2:{letter:"B",name:"Pull + Core",focus:"Back · rear delts · biceps · core",ex:[
+    ["One-arm Dumbbell Row","weighted",4],["Dumbbell Pullover","weighted",4],
+    ["Rear Delt Fly","weighted",3],["Dumbbell Curl","weighted",3],
+    ["Hammer Curl","weighted",2],["Side Plank","timed",3]
+  ]},
+  3:{letter:"C",name:"Legs + Shoulders",focus:"Quads · glutes · hamstrings · delts",ex:[
+    ["Goblet Squat","weighted",4],["Dumbbell Romanian Deadlift","weighted",4],
+    ["Bulgarian Split Squat","weighted",3],["Standing Calf Raise","weighted",3],
+    ["Lateral Raise","weighted",3],["Farmer Carry","timed_weighted",3]
+  ]}
+};
+
+let db;
+let settings = {id:"main", week:1, measurementInterval:14, migratedToLb:true, weightUnit:"lb"};
+
+const $ = id => document.getElementById(id);
+const today = () => new Date().toISOString().slice(0,10);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = ()=>{
+      db = req.result;
+      ["settings","drafts","sessions","measurements","checkins"].forEach(name=>{
+        if(!db.objectStoreNames.contains(name)) db.createObjectStore(name,{keyPath:"id"});
+      });
+    };
+    req.onsuccess = ()=>{ db=req.result; resolve(); };
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function get(store,id){
+  return new Promise((resolve,reject)=>{
+    const r=db.transaction(store).objectStore(store).get(id);
+    r.onsuccess=()=>resolve(r.result);
+    r.onerror=()=>reject(r.error);
+  });
+}
+function all(store){
+  return new Promise((resolve,reject)=>{
+    const r=db.transaction(store).objectStore(store).getAll();
+    r.onsuccess=()=>resolve(r.result||[]);
+    r.onerror=()=>reject(r.error);
+  });
+}
+function put(store,obj){
+  return new Promise((resolve,reject)=>{
+    const r=db.transaction(store,"readwrite").objectStore(store).put(obj);
+    r.onsuccess=()=>resolve(obj);
+    r.onerror=()=>reject(r.error);
+  });
+}
+function remove(store,id){
+  return new Promise((resolve,reject)=>{
+    const r=db.transaction(store,"readwrite").objectStore(store).delete(id);
+    r.onsuccess=()=>resolve();
+    r.onerror=()=>reject(r.error);
+  });
+}
+function toast(msg){
+  const t=$("toast");
+  if(!t) return;
+  t.textContent=msg;
+  t.classList.remove("hidden");
+  setTimeout(()=>t.classList.add("hidden"),1500);
+}
+function validSet(type,s){
+  if(!s || !s.done) return false;
+  if(type==="weighted") return Number(s.weight)>0 && Number(s.reps)>0;
+  if(type==="timed") return Number(s.seconds)>0;
+  if(type==="timed_weighted") return Number(s.weight)>0 && Number(s.seconds)>0;
+  return Number(s.weight)>0 && Number(s.reps)>0;
+}
+function workoutIdFor(session){
+  const n=Number(session?.workoutId ?? session?.workout);
+  if([1,2,3].includes(n)) return n;
+  const name=String(session?.name||"").toLowerCase();
+  if(name.includes("push")) return 1;
+  if(name.includes("pull")) return 2;
+  if(name.includes("leg") || name.includes("shoulder")) return 3;
+  return null;
+}
+function defTypeFor(session,e,ei){
+  const wid=workoutIdFor(session);
+  const byIndex = wid && WORKOUTS[wid]?.ex?.[ei]?.[1];
+  if(byIndex) return byIndex;
+  for(const w of Object.values(WORKOUTS)){
+    const hit=w.ex.find(x=>x[0]===e?.name);
+    if(hit) return hit[1];
+  }
+  if((e?.sets||[]).some(s=>Number(s.seconds)>0 && Number(s.weight)>0)) return "timed_weighted";
+  if((e?.sets||[]).some(s=>Number(s.seconds)>0)) return "timed";
+  return "weighted";
+}
+function safeTime(x){ return Number(x?.createdAt || x?.completedAt || 0); }
+
+async function nextWorkoutId(){
+  const sessions=(await all("sessions")).filter(Boolean).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  for(const s of sessions){
+    const id=workoutIdFor(s);
+    if(id) return id%3+1;
+  }
+  return 1;
+}
+
+async function renderHome(){
+  const hw=$("homeWeight"), hs=$("homeSessions"), hp=$("homePRs"), ha=$("homeAdherence");
+  if(hw) hw.textContent="Loading…";
+  if(hs) hs.textContent="Loading…";
+  if(hp) hp.textContent="Loading…";
+  if(ha) ha.textContent="Loading…";
+
+  try{
+    const sessions=await all("sessions").catch(()=>[]);
+    const measurements=await all("measurements").catch(()=>[]);
+    measurements.sort((a,b)=>safeTime(a)-safeTime(b));
+
+    const now=new Date(), start=new Date(now);
+    start.setDate(now.getDate()-now.getDay());
+    start.setHours(0,0,0,0);
+    const end=new Date(start); end.setDate(start.getDate()+7);
+    const week=sessions.filter(s=>{
+      if(!s?.date) return false;
+      const d=new Date(s.date+"T12:00:00");
+      return !Number.isNaN(d.getTime()) && d>=start && d<end;
+    });
+
+    const tracked=new Set();
+    sessions.forEach(s=>{
+      (s?.exercises||[]).forEach((e,ei)=>{
+        const type=defTypeFor(s,e,ei);
+        if((e?.sets||[]).some(set=>validSet(type,set))) tracked.add(e?.name||`Exercise ${ei+1}`);
+      });
+    });
+
+    const latest=measurements.at(-1);
+    if(hw) hw.textContent=(latest?.weight!=null)?latest.weight:"—";
+    if(hs) hs.textContent=`${week.length}/3`;
+    if(hp) hp.textContent=String(tracked.size);
+    if(ha){
+      const weekNo=Math.max(1,Number(settings.week)||1);
+      ha.textContent=`${Math.min(100,Math.round(sessions.length/(weekNo*3)*100))}%`;
+    }
+
+    let next=await nextWorkoutId().catch(()=>1);
+    if(!WORKOUTS[next]) next=1;
+    if($("nextWorkoutTitle")) $("nextWorkoutTitle").textContent=`Workout ${WORKOUTS[next].letter} — ${WORKOUTS[next].name}`;
+    if($("nextWorkoutMeta")) $("nextWorkoutMeta").textContent=WORKOUTS[next].focus;
+
+    const body=$("bodyCheckSummary");
+    if(body){
+      if(!latest?.date){
+        body.textContent="Add your first body measurement to create a baseline.";
+      }else{
+        const due=new Date(latest.date+"T12:00:00");
+        if(Number.isNaN(due.getTime())){
+          body.textContent="Open Progress to review your saved entries.";
+        }else{
+          due.setDate(due.getDate()+(Number(settings.measurementInterval)||14));
+          body.textContent=`Next check-in: ${due.toLocaleDateString()}`;
+        }
+      }
+    }
+  }catch(err){
+    console.error("renderHome failed",err);
+    if(hw) hw.textContent="—";
+    if(hs) hs.textContent="0/3";
+    if(hp) hp.textContent="0";
+    if(ha) ha.textContent="0%";
+    if($("nextWorkoutTitle")) $("nextWorkoutTitle").textContent="Workout A — Push + Core";
+    if($("nextWorkoutMeta")) $("nextWorkoutMeta").textContent="Your saved history remains available.";
+    if($("bodyCheckSummary")) $("bodyCheckSummary").textContent="Open Progress to review saved entries.";
+  }
+}
+
+function draftId(){ return `draft:${$("workoutDate")?.value||today()}:${$("workoutSelect")?.value||1}`; }
+
+async function renderWorkout(){
+  const selector=$("workoutSelect"), cards=$("exerciseCards");
+  if(!selector || !cards) return;
+  let id=Number(selector.value)||1;
+  if(!WORKOUTS[id]) id=1;
+  const w=WORKOUTS[id];
+  const draft=await get("drafts",draftId()).catch(()=>null);
+  let html="";
+
+  w.ex.forEach((e,ei)=>{
+    const [name,type,setCount]=e;
+    let rows="";
+    for(let si=0;si<setCount;si++){
+      const v=draft?.data?.exercises?.[ei]?.sets?.[si]||{};
+      if(type==="weighted"){
+        rows+=`<div class="setrow" data-row="${ei}-${si}"><span>S${si+1}</span><input data-e="${ei}" data-s="${si}" data-f="weight" type="number" step=".5" placeholder="lb" value="${v.weight??""}"><input data-e="${ei}" data-s="${si}" data-f="reps" type="number" placeholder="reps" value="${v.reps??""}"><input class="done" data-e="${ei}" data-s="${si}" data-f="done" type="checkbox" ${v.done?"checked":""}></div>`;
+      }else if(type==="timed"){
+        rows+=`<div class="setrow" data-row="${ei}-${si}"><span>S${si+1}</span><input data-e="${ei}" data-s="${si}" data-f="seconds" type="number" placeholder="sec" value="${v.seconds??""}"><input disabled value="—"><input class="done" data-e="${ei}" data-s="${si}" data-f="done" type="checkbox" ${v.done?"checked":""}></div>`;
+      }else{
+        rows+=`<div class="setrow" data-row="${ei}-${si}"><span>S${si+1}</span><input data-e="${ei}" data-s="${si}" data-f="weight" type="number" step=".5" placeholder="lb" value="${v.weight??""}"><input data-e="${ei}" data-s="${si}" data-f="seconds" type="number" placeholder="sec" value="${v.seconds??""}"><input class="done" data-e="${ei}" data-s="${si}" data-f="done" type="checkbox" ${v.done?"checked":""}></div>`;
+      }
+    }
+    html+=`<div class="exercise"><button class="exhead" type="button" data-toggle="${ei}">${name} <span class="muted">${setCount} sets</span></button><div id="exerciseBody${ei}" class="exbody ${ei===0?"":"hidden"}"><div class="setrow muted"><span>Set</span><span>${type==="timed"?"Sec":"LB"}</span><span>${type==="weighted"?"Reps":"Sec"}</span><span>✓</span></div>${rows}</div></div>`;
+  });
+
+  cards.innerHTML=html;
+  document.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{
+    const body=$("exerciseBody"+b.dataset.toggle);
+    if(body) body.classList.toggle("hidden");
+  });
+  document.querySelectorAll("#exerciseCards input[data-e]").forEach(x=>x.onchange=saveDraft);
+  if($("sessionNotes")) $("sessionNotes").value=draft?.data?.notes??"";
+}
+
+function collectWorkout(){
+  const id=Number($("workoutSelect")?.value)||1;
+  const w=WORKOUTS[id]||WORKOUTS[1];
+  const exercises=w.ex.map(e=>({name:e[0],sets:Array.from({length:e[2]},()=>({weight:"",reps:"",seconds:"",done:false}))}));
+  document.querySelectorAll("#exerciseCards input[data-e]").forEach(x=>{
+    const ei=Number(x.dataset.e), si=Number(x.dataset.s), f=x.dataset.f;
+    exercises[ei].sets[si][f]=x.type==="checkbox"?x.checked:(x.value===""?"":Number(x.value));
+  });
+  return {workoutId:id,date:$("workoutDate")?.value||today(),notes:$("sessionNotes")?.value||"",exercises};
+}
+async function saveDraft(){
+  await put("drafts",{id:draftId(),updatedAt:Date.now(),data:collectWorkout()});
+  toast("Draft saved");
+}
+async function finishWorkout(){
+  const d=collectWorkout(), w=WORKOUTS[d.workoutId];
+  let validCount=0;
+  d.exercises.forEach((e,ei)=>{
+    const type=w.ex[ei][1];
+    e.sets.forEach((s,si)=>{
+      s.valid=validSet(type,s);
+      if(s.valid) validCount++;
+      else if(s.done) document.querySelector(`[data-row="${ei}-${si}"]`)?.classList.add("bad");
+    });
+  });
+  if(!validCount){ toast("No valid completed sets"); return; }
+  await put("sessions",{id:`session:${Date.now()}`,completedAt:Date.now(),date:d.date,workoutId:d.workoutId,name:w.name,notes:d.notes,exercises:d.exercises});
+  await remove("drafts",draftId());
+  toast("Workout saved");
+  await renderWorkout();
+  await renderHome();
+}
+async function resumeDraft(){
+  const drafts=(await all("drafts")).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const d=drafts[0];
+  if(!d){ toast("No saved draft"); return; }
+  if($("workoutSelect")) $("workoutSelect").value=d.data?.workoutId||1;
+  if($("workoutDate")) $("workoutDate").value=d.data?.date||today();
+  await renderWorkout();
+  await navigate("workout");
+}
+
+function showSession(){
+  $("currentSessionTab")?.classList.add("active");
+  $("historyTab")?.classList.remove("active");
+  $("sessionView")?.classList.remove("hidden");
+  $("historyView")?.classList.add("hidden");
+}
+async function showHistory(){
+  $("historyTab")?.classList.add("active");
+  $("currentSessionTab")?.classList.remove("active");
+  $("sessionView")?.classList.add("hidden");
+  $("historyView")?.classList.remove("hidden");
+  await renderHistory();
+}
+async function renderHistory(){
+  const holder=$("historyList");
+  if(!holder) return;
+  const sessions=(await all("sessions")).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  holder.innerHTML=sessions.length?sessions.map(s=>{
+    const wid=workoutIdFor(s);
+    const letter=WORKOUTS[wid]?.letter||"?";
+    const exercises=(s?.exercises||[]).map((e,ei)=>{
+      const type=defTypeFor(s,e,ei);
+      const rows=(e?.sets||[]).filter(set=>validSet(type,set)).map((set,i)=>`<div class="muted">Set ${i+1}: ${set.weight||"—"} lb · ${set.reps||set.seconds||"—"}</div>`).join("");
+      return `<div class="history"><b>${esc(e?.name||"Exercise")}</b>${rows||'<div class="muted">No valid sets</div>'}</div>`;
+    }).join("");
+    return `<details class="history"><summary>${esc(s?.date||"Unknown date")} · Workout ${letter} — ${esc(s?.name||"Workout")}</summary>${exercises}<button class="delete" type="button" data-delete-session="${esc(s.id)}">Delete workout</button></details>`;
+  }).join(""):'<div class="muted">No workouts yet.</div>';
+
+  document.querySelectorAll("[data-delete-session]").forEach(b=>b.onclick=async()=>{
+    if(confirm("Delete this workout?")){
+      await remove("sessions",b.dataset.deleteSession);
+      toast("Workout deleted");
+      await renderHistory();
+      await renderHome();
+    }
+  });
+}
+
+async function fileData(file){
+  if(!file) return null;
+  return await new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=()=>reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+const numberOrNull=id=>{
+  const node=$(id);
+  return !node || node.value==="" ? null : Number(node.value);
+};
+async function saveMeasurement(){
+  const rec={
+    id:`m:${Date.now()}`,date:today(),createdAt:Date.now(),
+    weight:numberOrNull("mWeight"),waist:numberOrNull("mWaist"),chest:numberOrNull("mChest"),arm:numberOrNull("mArm"),thigh:numberOrNull("mThigh"),
+    note:$("mNote")?.value||"",
+    photos:{front:await fileData($("pFront")?.files?.[0]),side:await fileData($("pSide")?.files?.[0]),back:await fileData($("pBack")?.files?.[0])}
+  };
+  await put("measurements",rec);
+  toast("Progress saved");
+  await renderProgress();
+  await renderHome();
+}
+async function renderProgress(){
+  const holder=$("measurementHistory");
+  if(!holder) return;
+  const m=(await all("measurements")).sort((a,b)=>safeTime(a)-safeTime(b));
+  holder.innerHTML=m.length?m.slice().reverse().map(x=>`<button class="progress-entry" type="button" data-progress-id="${esc(x.id)}"><b>${esc(x.date||"Unknown date")}</b><div class="muted">${x.weight??"—"} lb · waist ${x.waist??"—"} cm · chest ${x.chest??"—"} cm · arm ${x.arm??"—"} cm · thigh ${x.thigh??"—"} cm</div></button>`).join(""):'<div class="muted">No progress entries yet.</div>';
+  document.querySelectorAll("[data-progress-id]").forEach(b=>b.onclick=()=>openProgress(b.dataset.progressId));
+}
+async function openProgress(id){
+  const x=await get("measurements",id);
+  if(!x) return;
+  const photos=Object.entries(x.photos||{}).filter(([,v])=>v);
+  $("modalContent").innerHTML=`<h2>${esc(x.date||"Progress entry")}</h2><div class="history"><div>Weight: <b>${x.weight??"—"} lb</b></div><div>Waist: <b>${x.waist??"—"} cm</b></div><div>Chest: <b>${x.chest??"—"} cm</b></div><div>Arm: <b>${x.arm??"—"} cm</b></div><div>Thigh: <b>${x.thigh??"—"} cm</b></div></div>${x.note?`<div class="history">${esc(x.note)}</div>`:""}${photos.length?`<div class="modalphotos">${photos.map(([p,u])=>`<div><b>${esc(p)}</b><img src="${u}"></div>`).join("")}</div>`:""}<button id="deleteProgress" class="delete" type="button">Delete progress entry</button>`;
+  $("modal")?.classList.remove("hidden");
+  $("deleteProgress").onclick=async()=>{
+    if(confirm("Delete this progress entry?")){
+      await remove("measurements",id);
+      closeModal();
+      toast("Progress entry deleted");
+      await renderProgress();
+      await renderHome();
+    }
+  };
+}
+function help(type){
+  const map={
+    weight:["Weight","Use the same scale under similar conditions, ideally in the morning after using the bathroom and before breakfast."],
+    waist:["Waist","Measure horizontally at navel level, relaxed, after a normal exhale."],
+    chest:["Chest","Measure around the fullest part of the chest, roughly nipple level."],
+    arm:["Arm","Measure around the largest part of the same upper arm each time, arm relaxed."],
+    thigh:["Thigh","Measure around the largest part of the same upper thigh each time."]
+  };
+  const c=map[type]||["Measurement","Measure consistently each time."];
+  $("modalContent").innerHTML=`<h2>${c[0]}</h2><div class="history">${c[1]}</div>`;
+  $("modal")?.classList.remove("hidden");
+}
+function closeModal(){ $("modal")?.classList.add("hidden"); }
+
+async function refreshApp(){
+  if("serviceWorker" in navigator){
+    for(const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+  }
+  if("caches" in window){
+    for(const key of await caches.keys()) await caches.delete(key);
+  }
+  toast("App files refreshed");
+  setTimeout(()=>location.reload(),500);
+}
+async function exportData(){
+  const data={version:VERSION,settings,sessions:await all("sessions"),drafts:await all("drafts"),measurements:await all("measurements"),checkins:await all("checkins")};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="Farhad-Trainer-V2.4.2-Backup.json"; a.click();
+}
+
+async function navigate(page){
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  $(page)?.classList.add("active");
+  document.querySelectorAll("nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
+  if(page==="home") await renderHome();
+  if(page==="workout"){ await renderWorkout(); showSession(); }
+  if(page==="progress") await renderProgress();
+}
+function bind(){
+  document.querySelectorAll("nav button[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
+  if($("startNextBtn")) $("startNextBtn").onclick=async()=>{ $("workoutSelect").value=await nextWorkoutId(); await renderWorkout(); await navigate("workout"); };
+  if($("resumeDraftBtn")) $("resumeDraftBtn").onclick=resumeDraft;
+  if($("goProgressBtn")) $("goProgressBtn").onclick=()=>navigate("progress");
+  if($("workoutSelect")) $("workoutSelect").onchange=renderWorkout;
+  if($("workoutDate")) $("workoutDate").onchange=renderWorkout;
+  if($("saveDraftBtn")) $("saveDraftBtn").onclick=saveDraft;
+  if($("finishBtn")) $("finishBtn").onclick=finishWorkout;
+  if($("currentSessionTab")) $("currentSessionTab").onclick=showSession;
+  if($("historyTab")) $("historyTab").onclick=showHistory;
+  if($("backToSessionBtn")) $("backToSessionBtn").onclick=showSession;
+  if($("saveMeasurementBtn")) $("saveMeasurementBtn").onclick=saveMeasurement;
+  document.querySelectorAll(".help").forEach(b=>b.onclick=()=>help(b.dataset.help));
+  if($("closeModal")) $("closeModal").onclick=closeModal;
+  if($("modal")) $("modal").onclick=e=>{ if(e.target===$("modal")) closeModal(); };
+  if($("refreshBtn")) $("refreshBtn").onclick=refreshApp;
+  if($("exportBtn")) $("exportBtn").onclick=exportData;
+}
+
+async function init(){
+  await openDB();
+  settings={...settings,...(await get("settings","main")||{})};
+  await put("settings",settings);
+  if($("workoutDate")) $("workoutDate").value=today();
+  bind();
+  await renderHome();
+  await renderWorkout();
+  await renderProgress();
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js?v=2.4.2").catch(()=>{});
+}
+
+window.addEventListener("error",e=>console.error("Farhad Trainer error",e.error||e.message));
+window.addEventListener("unhandledrejection",e=>console.error("Farhad Trainer promise error",e.reason));
 init().catch(err=>{
- console.error("Initialization failed",err);
- try{
-   $("homeWeight").textContent="—";$("homeSessions").textContent="0/3";$("homePRs").textContent="0";$("homeAdherence").textContent="0%";
-   $("nextWorkoutTitle").textContent="Workout A — Push + Core";
-   $("nextWorkoutMeta").textContent="App recovery mode. Your saved history remains in IndexedDB.";
- }catch(_){}
+  console.error("Initialization failed",err);
+  if($("homeWeight")) $("homeWeight").textContent="—";
+  if($("homeSessions")) $("homeSessions").textContent="0/3";
+  if($("homePRs")) $("homePRs").textContent="0";
+  if($("homeAdherence")) $("homeAdherence").textContent="0%";
+  if($("nextWorkoutTitle")) $("nextWorkoutTitle").textContent="Workout A — Push + Core";
+  if($("nextWorkoutMeta")) $("nextWorkoutMeta").textContent="Recovery mode — saved history is preserved.";
+  bind();
 });
