@@ -1,17 +1,13 @@
-# Farhad Trainer V2.4.2 — Button Fix
+# Farhad Trainer V2.4.4 — History Restored
 
-This patch fixes the V2.4.1 initialization bug that caused all buttons to stop working.
+This build keeps the YouTube exercise-guide links and adds a permanent **History** item in the bottom navigation.
 
-The issue was a mismatch between the HTML and JavaScript: the JavaScript expected controls that were not present in the deployed page. Initialization stopped before button event handlers were attached.
+History now has:
+- Workouts
+- Progress entries
+- Tap any entry to open its full details
+- Delete workout/history entries with confirmation
+- Refresh button
+- The original Workout → Workout history tab remains as well
 
-V2.4.2:
-- Binds only to controls that actually exist.
-- Keeps the same `FarhadTrainerV21` IndexedDB database, preserving existing data.
-- Keeps dashboard stats from getting stuck on Loading.
-- Workout History remains tappable and deletable.
-- Progress History remains tappable and deletable.
-- Measurement help buttons work.
-- RPE remains removed.
-- Weight remains in lb.
-
-After upload to GitHub Pages, refresh Safari. The header should show `V2.4.2 · Button Fix`.
+It continues to use the same `FarhadTrainerV21` IndexedDB database, so existing saved data is preserved.

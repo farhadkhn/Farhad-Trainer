@@ -1,6 +1,6 @@
 
 const DB_NAME = "FarhadTrainerV21";
-const VERSION = "2.4.2";
+const VERSION = "2.4.4";
 
 const WORKOUTS = {
   1:{letter:"A",name:"Push + Core",focus:"Chest · shoulders · triceps · core",ex:[
@@ -26,6 +26,11 @@ let settings = {id:"main", week:1, measurementInterval:14, migratedToLb:true, we
 const $ = id => document.getElementById(id);
 const today = () => new Date().toISOString().slice(0,10);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+
+function youtubeGuide(name){
+  const q = encodeURIComponent(name + " proper form tutorial");
+  return `https://www.youtube.com/results?search_query=${q}`;
+}
 
 function openDB(){
   return new Promise((resolve,reject)=>{
@@ -208,7 +213,7 @@ async function renderWorkout(){
         rows+=`<div class="setrow" data-row="${ei}-${si}"><span>S${si+1}</span><input data-e="${ei}" data-s="${si}" data-f="weight" type="number" step=".5" placeholder="lb" value="${v.weight??""}"><input data-e="${ei}" data-s="${si}" data-f="seconds" type="number" placeholder="sec" value="${v.seconds??""}"><input class="done" data-e="${ei}" data-s="${si}" data-f="done" type="checkbox" ${v.done?"checked":""}></div>`;
       }
     }
-    html+=`<div class="exercise"><button class="exhead" type="button" data-toggle="${ei}">${name} <span class="muted">${setCount} sets</span></button><div id="exerciseBody${ei}" class="exbody ${ei===0?"":"hidden"}"><div class="setrow muted"><span>Set</span><span>${type==="timed"?"Sec":"LB"}</span><span>${type==="weighted"?"Reps":"Sec"}</span><span>✓</span></div>${rows}</div></div>`;
+    html+=`<div class="exercise"><button class="exhead" type="button" data-toggle="${ei}">${name} <span class="muted">${setCount} sets</span></button><div id="exerciseBody${ei}" class="exbody ${ei===0?"":"hidden"}"><a class="guide-link" href="${youtubeGuide(name)}" target="_blank" rel="noopener noreferrer">▶ Watch proper-form guide on YouTube</a><div class="setrow muted"><span>Set</span><span>${type==="timed"?"Sec":"LB"}</span><span>${type==="weighted"?"Reps":"Sec"}</span><span>✓</span></div>${rows}</div></div>`;
   });
 
   cards.innerHTML=html;
@@ -376,7 +381,77 @@ async function exportData(){
   const data={version:VERSION,settings,sessions:await all("sessions"),drafts:await all("drafts"),measurements:await all("measurements"),checkins:await all("checkins")};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="Farhad-Trainer-V2.4.2-Backup.json"; a.click();
+  a.href=URL.createObjectURL(blob); a.download="Farhad-Trainer-V2.4.4-Backup.json"; a.click();
+}
+
+
+async function renderHistoryPage(){
+  await renderHistoryPageWorkouts();
+  await renderHistoryPageProgress();
+}
+async function renderHistoryPageWorkouts(){
+  const holder=$("historyPageWorkoutList");
+  if(!holder) return;
+  const sessions=(await all("sessions")).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  if(!sessions.length){
+    holder.innerHTML='<div class="muted">No completed workouts yet.</div>';
+    return;
+  }
+  holder.innerHTML=sessions.map(s=>{
+    const wid=workoutIdFor(s);
+    const letter=WORKOUTS[wid]?.letter||"?";
+    const validCount=(s?.exercises||[]).reduce((n,e,ei)=>{
+      const type=defTypeFor(s,e,ei);
+      return n+(e?.sets||[]).filter(set=>validSet(type,set)).length;
+    },0);
+    return `<button class="history-entry" type="button" data-open-workout="${esc(s.id)}"><b>${esc(s?.date||"Unknown date")} · Workout ${letter} — ${esc(s?.name||"Workout")}</b><div class="muted">${validCount} completed sets</div></button>`;
+  }).join("");
+  document.querySelectorAll("[data-open-workout]").forEach(b=>b.onclick=()=>openWorkoutHistoryEntry(b.dataset.openWorkout));
+}
+async function openWorkoutHistoryEntry(id){
+  const s=await get("sessions",id);
+  if(!s) return;
+  const wid=workoutIdFor(s);
+  const letter=WORKOUTS[wid]?.letter||"?";
+  const exercises=(s?.exercises||[]).map((e,ei)=>{
+    const type=defTypeFor(s,e,ei);
+    const rows=(e?.sets||[]).filter(set=>validSet(type,set)).map((set,i)=>`<div class="muted">Set ${i+1}: ${set.weight||"—"} lb · ${set.reps||set.seconds||"—"}</div>`).join("");
+    return `<div class="history"><b>${esc(e?.name||"Exercise")}</b>${rows||'<div class="muted">No valid sets</div>'}</div>`;
+  }).join("");
+  $("modalContent").innerHTML=`<h2>${esc(s?.date||"Workout")} · Workout ${letter}</h2>${exercises}<button id="deleteWorkoutFromHistoryPage" class="delete" type="button">Delete workout</button>`;
+  $("modal")?.classList.remove("hidden");
+  $("deleteWorkoutFromHistoryPage").onclick=async()=>{
+    if(confirm("Delete this workout?")){
+      await remove("sessions",id);
+      closeModal();
+      toast("Workout deleted");
+      await renderHistoryPage();
+      await renderHome();
+    }
+  };
+}
+async function renderHistoryPageProgress(){
+  const holder=$("historyPageProgressList");
+  if(!holder) return;
+  const entries=(await all("measurements")).sort((a,b)=>safeTime(b)-safeTime(a));
+  if(!entries.length){
+    holder.innerHTML='<div class="muted">No progress entries yet.</div>';
+    return;
+  }
+  holder.innerHTML=entries.map(x=>`<button class="history-entry" type="button" data-history-progress="${esc(x.id)}"><b>${esc(x.date||"Unknown date")}</b><div class="muted">${x.weight??"—"} lb · waist ${x.waist??"—"} cm · chest ${x.chest??"—"} cm · arm ${x.arm??"—"} cm · thigh ${x.thigh??"—"} cm</div></button>`).join("");
+  document.querySelectorAll("[data-history-progress]").forEach(b=>b.onclick=()=>openProgress(b.dataset.historyProgress));
+}
+function showHistoryWorkouts(){
+  $("historyWorkoutTab")?.classList.add("active");
+  $("historyProgressTab")?.classList.remove("active");
+  $("historyWorkoutPane")?.classList.remove("hidden");
+  $("historyProgressPane")?.classList.add("hidden");
+}
+function showHistoryProgress(){
+  $("historyProgressTab")?.classList.add("active");
+  $("historyWorkoutTab")?.classList.remove("active");
+  $("historyProgressPane")?.classList.remove("hidden");
+  $("historyWorkoutPane")?.classList.add("hidden");
 }
 
 async function navigate(page){
@@ -386,6 +461,7 @@ async function navigate(page){
   if(page==="home") await renderHome();
   if(page==="workout"){ await renderWorkout(); showSession(); }
   if(page==="progress") await renderProgress();
+  if(page==="history"){ await renderHistoryPage(); showHistoryWorkouts(); }
 }
 function bind(){
   document.querySelectorAll("nav button[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
@@ -405,6 +481,9 @@ function bind(){
   if($("modal")) $("modal").onclick=e=>{ if(e.target===$("modal")) closeModal(); };
   if($("refreshBtn")) $("refreshBtn").onclick=refreshApp;
   if($("exportBtn")) $("exportBtn").onclick=exportData;
+  if($("historyWorkoutTab")) $("historyWorkoutTab").onclick=showHistoryWorkouts;
+  if($("historyProgressTab")) $("historyProgressTab").onclick=showHistoryProgress;
+  if($("historyRefreshBtn")) $("historyRefreshBtn").onclick=renderHistoryPage;
 }
 
 async function init(){
@@ -416,7 +495,7 @@ async function init(){
   await renderHome();
   await renderWorkout();
   await renderProgress();
-  if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js?v=2.4.2").catch(()=>{});
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js?v=2.4.4").catch(()=>{});
 }
 
 window.addEventListener("error",e=>console.error("Farhad Trainer error",e.error||e.message));
